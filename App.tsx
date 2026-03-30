@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback } from 'react';
-import { CardData, GameStatus, GameTheme, QuizQuestion, TeamConfig } from './types';
+import { CardData, GameStatus, GameTheme, QuizQuestion, TeamConfig, GameHistoryItem } from './types';
 import { audioService } from './services/audioService';
 import { Card } from './components/Card';
 import { QuestionModal } from './components/QuestionModal';
@@ -51,6 +51,26 @@ const App: React.FC = () => {
     setScores(new Array(finalTeams.length).fill(0));
     setFlippedIndices([]);
     setLastMatchedPair([]);
+
+    try {
+      const historyStr = localStorage.getItem('trucxanh_history');
+      let history: GameHistoryItem[] = historyStr ? JSON.parse(historyStr) : [];
+      
+      const isDuplicate = history.length > 0 && JSON.stringify(history[0].theme) === JSON.stringify(gameTheme);
+      
+      if (!isDuplicate) {
+        const newItem: GameHistoryItem = {
+          id: Date.now().toString(),
+          date: new Date().toISOString(),
+          theme: gameTheme
+        };
+        history = [newItem, ...history].slice(0, 20);
+        localStorage.setItem('trucxanh_history', JSON.stringify(history));
+      }
+    } catch (e) {
+      console.error("Could not save history", e);
+    }
+
     // Chuyển sang bước chọn đội ngẫu nhiên thay vì chơi ngay
     setStatus(GameStatus.RANDOMIZING);
   }, []);

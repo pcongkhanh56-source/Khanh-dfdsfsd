@@ -43,3 +43,9 @@ export interface GameTheme {
     quiz: QuizQuestion;
   }[];
 }
+
+export interface GameHistoryItem {
+  id: string;
+  date: string;
+  theme: GameTheme;
+}

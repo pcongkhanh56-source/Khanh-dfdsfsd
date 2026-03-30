@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { GameTheme, TeamConfig } from '../types';
+import { GameTheme, TeamConfig, GameHistoryItem } from '../types';
 import { getThemeFromGemini, getSingleQuestionFromGemini, editQuestionWithGemini, setCustomApiKey, getCustomApiKey } from '../services/geminiService';
 
 interface SetupScreenProps {
@@ -42,6 +42,8 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete, currentTea
   const [editingInstructions, setEditingInstructions] = useState<{ [key: number]: string }>({});
   const [manualEditMode, setManualEditMode] = useState<{ [key: number]: boolean }>({});
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyItems, setHistoryItems] = useState<GameHistoryItem[]>([]);
   const [apiKeyInput, setApiKeyInput] = useState(getCustomApiKey());
   const [teams, setTeams] = useState<TeamConfig[]>(currentTeams);
   const [manualTheme, setManualTheme] = useState<GameTheme>({
@@ -85,6 +87,36 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete, currentTea
   const handleSaveApiKey = () => {
     setCustomApiKey(apiKeyInput.trim());
     setShowApiKeyModal(false);
+  };
+
+  const loadHistory = () => {
+    try {
+      const historyStr = localStorage.getItem('trucxanh_history');
+      if (historyStr) {
+        setHistoryItems(JSON.parse(historyStr));
+      }
+    } catch (e) {
+      console.error("Could not load history", e);
+    }
+  };
+
+  const handleOpenHistory = () => {
+    loadHistory();
+    setShowHistoryModal(true);
+  };
+
+  const handleSelectHistory = (item: GameHistoryItem) => {
+    setManualTheme(item.theme);
+    setPairCount(item.theme.items.length);
+    setIsAiGenerated(true); // Treat as AI generated so they can regenerate if they want
+    setMode('MANUAL');
+    setShowHistoryModal(false);
+  };
+
+  const handleDeleteHistory = (id: string) => {
+    const newHistory = historyItems.filter(h => h.id !== id);
+    setHistoryItems(newHistory);
+    localStorage.setItem('trucxanh_history', JSON.stringify(newHistory));
   };
 
   const handleAiSubmit = async (e?: React.FormEvent) => {
@@ -186,7 +218,13 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete, currentTea
   if (mode === 'CHOICE') {
     return (
       <div className="max-w-5xl mx-auto py-12 px-4 text-center animate-in fade-in slide-in-from-bottom-8 duration-1000 relative">
-        <div className="absolute top-4 right-4 z-50">
+        <div className="absolute top-4 right-4 z-50 flex gap-2">
+          <button 
+            onClick={handleOpenHistory}
+            className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm border-2 border-slate-200 rounded-xl text-slate-600 font-bold hover:border-indigo-500 hover:text-indigo-600 transition-all shadow-sm"
+          >
+            <i className="fa-solid fa-clock-rotate-left"></i> Lịch sử
+          </button>
           <button 
             onClick={() => setShowApiKeyModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm border-2 border-slate-200 rounded-xl text-slate-600 font-bold hover:border-emerald-500 hover:text-emerald-600 transition-all shadow-sm"
@@ -194,6 +232,55 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete, currentTea
             <i className="fa-solid fa-key"></i> API Key
           </button>
         </div>
+
+        {showHistoryModal && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 text-left">
+            <div className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 duration-200 max-h-[80vh] flex flex-col">
+              <div className="flex items-center justify-between mb-6 shrink-0">
+                <h3 className="text-2xl font-black text-slate-800">Lịch sử bộ câu hỏi</h3>
+                <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-rose-500 transition-colors">
+                  <i className="fa-solid fa-xmark text-2xl"></i>
+                </button>
+              </div>
+              
+              <div className="overflow-y-auto flex-grow pr-2 space-y-4">
+                {historyItems.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400">
+                    <i className="fa-solid fa-folder-open text-5xl mb-4 opacity-50"></i>
+                    <p className="font-bold">Chưa có lịch sử chơi nào.</p>
+                  </div>
+                ) : (
+                  historyItems.map(item => (
+                    <div key={item.id} className="bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 flex items-center justify-between hover:border-indigo-200 transition-colors">
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-lg">{item.theme.name}</h4>
+                        <p className="text-xs text-slate-500 font-semibold mt-1">
+                          <i className="fa-regular fa-calendar mr-1"></i> 
+                          {new Date(item.date).toLocaleString('vi-VN')} • {item.theme.items.length} cặp thẻ
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleSelectHistory(item)}
+                          className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-xl font-bold hover:bg-indigo-600 hover:text-white transition-colors"
+                        >
+                          Chơi lại
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteHistory(item.id)}
+                          className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center hover:bg-rose-600 hover:text-white transition-colors"
+                          title="Xóa"
+                        >
+                          <i className="fa-solid fa-trash-can"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {showApiKeyModal && (
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 text-left">
